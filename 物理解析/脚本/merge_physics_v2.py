@@ -328,7 +328,7 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
             render_entry(doc, e)
         order.append('  %02d. %-44s <- %s' % (len(order), title, os.path.basename(fpath)))
 
-    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.new_page_section(doc, cols=1, numbered=True)
     FM.build_version_page(doc, '物理', [
         ('大本解析' if region == 'main' else '小本解析',
          '%d %s · %d 条目' % (len(items), '章' if region == 'main' else '练', n_entries))])
@@ -377,7 +377,7 @@ def build_combined(ordered, out_name):
             for e in extract_entries_rich(os.path.join(ROOT, fpath), region):
                 render_entry(doc, e)
                 n += 1
-    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.new_page_section(doc, cols=1, numbered=True)
     FM.build_version_page(doc, '物理', [
         ('大本解析', '%d 章' % len(big)),
         ('小本解析', '%d 练' % len(small)),

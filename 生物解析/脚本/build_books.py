@@ -358,7 +358,7 @@ def main():
         es = entries_of_chapter(path_of(day, kind, num))
         n_entry += len(es)
         render_chapter(book, title_of(day, kind, num), es)
-    FM.new_page_section(book, cols=1, numbered=False)
+    FM.new_page_section(book, cols=1, numbered=True)
     FM.build_version_page(book, '生物', [('大本解析', '%d 章 · %d 条目' % (len(plan), n_entry))])
     FM.enable_even_odd_headers(book)
     p_book = save_doc(book, os.path.join(OUT_BOOK, '大本解析_全书.docx'))
@@ -420,7 +420,7 @@ def main():
         es = ER.extract_entries(rp)
         n_xb += len(es)
         render_chapter(xb, name, es)
-    FM.new_page_section(xb, cols=1, numbered=False)
+    FM.new_page_section(xb, cols=1, numbered=True)
     FM.build_version_page(xb, '生物', [('小本解析', '%d 篇 · %d 条目' % (len(xb_items), n_xb))])
     FM.enable_even_odd_headers(xb)
     p_xb = save_doc(xb, os.path.join(OUT_XB, '小本解析_合集.docx'))
@@ -465,7 +465,7 @@ def main():
         if kind == 'prac':
             _m, rp = ER.split_practice(rp)
         render_chapter(cb, name, ER.extract_entries(rp))
-    FM.new_page_section(cb, cols=1, numbered=False)
+    FM.new_page_section(cb, cols=1, numbered=True)
     FM.build_version_page(cb, '生物', [
         ('大本解析', '%d 章 · %d 条目' % (len(plan), n_entry)),
         ('小本解析', '%d 篇 · %d 条目' % (len(xb_items), n_xb)),
