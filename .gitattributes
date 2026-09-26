@@ -1,0 +1,18 @@
+# 统一换行处理，避免 Windows/Linux 协作时产生无意义的整文件 diff
+* text=auto
+
+# 图片按二进制处理，禁止换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+
+# PowerShell 脚本用 CRLF（Windows 上更友好；注意中文脚本必须 UTF-8 with BOM）
+*.ps1  text eol=crlf
+
+# 其余源码/文档用 LF
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.txt  text eol=lf
