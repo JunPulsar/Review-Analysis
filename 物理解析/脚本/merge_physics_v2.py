@@ -17,6 +17,7 @@ merge_physics_v2.py — 物理解析小册子（规范排版版）
 """
 
 import copy
+import io
 import os
 import re
 import sys
@@ -26,6 +27,9 @@ from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.opc.part import Part
+from PIL import Image
 from lxml import etree
 
 import merge_physics as MP          # 复用：全部正则、抽取判定、目录映射
@@ -33,7 +37,186 @@ import frontmatter as FM            # 封面 / 说明页 / 版本记录（与生
 
 W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 M = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
+WP = '{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}'
+A = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+V = '{urn:schemas-microsoft-com:vml}'
+R = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
 COPY_TAGS = {W + 'r', M + 'oMath', M + 'oMathPara', W + 'hyperlink'}
+IMG_TAGS = {W + 'drawing', W + 'pict'}
+EMU_CM = 360000          # 1 cm = 360000 EMU
+MIN_FIG_CM = 1.0         # 小于 1cm 宽的不是插图，是行内符号碎屑（实测源里有大量 0.11cm 的）
+
+
+def drawing_width_cm(el):
+    """取图片宽度（cm）；取不到返回 0"""
+    if el.tag == W + 'pict':
+        shape = el.find('.//' + V + 'shape')
+        if shape is not None:
+            try:
+                return float(shape.get('style', '').split('width:')[1].split('pt')[0]) / 28.35
+            except Exception:
+                return 0.0
+        return 0.0
+    ext = el.find('.//' + WP + 'extent')
+    if ext is None:
+        return 0.0
+    try:
+        return int(ext.get('cx') or 0) / float(EMU_CM)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def collect_images(allp, i0, i1, min_cm=MIN_FIG_CM):
+    """收集 allp[i0..i1] 范围内的图片元素，按出现顺序，滤掉碎屑
+
+    必须传**全量段落列表**：只有图没有文字的段落，`p.text` 是空串，
+    若用「非空段落」列表会把这些段落连带图片一起漏掉（实测漏掉近一半）。
+    """
+    out = []
+    for k in range(i0, min(i1 + 1, len(allp))):
+        for el in allp[k]._element.iter():
+            if el.tag in IMG_TAGS and drawing_width_cm(el) >= min_cm:
+                out.append(el)
+    return out
+
+
+_IMG_FALLBACK = {'emf': 'image/x-emf', 'wmf': 'image/x-wmf', 'svg': 'image/svg+xml',
+                 'tif': 'image/tiff', 'tiff': 'image/tiff', 'bmp': 'image/bmp',
+                 'gif': 'image/gif', 'png': 'image/png', 'jpg': 'image/jpeg',
+                 'jpeg': 'image/jpeg'}
+
+
+_MAX_FIG_PX = 1400       # 栏宽 8.8cm 在 300dpi 下约 1040px，留点余量取 1400
+
+
+def _looks_gray(im):
+    """抽样判断是否近似灰度（教辅插图多为黑白线条图，转灰度能省一大半）"""
+    if im.mode in ('1', 'L', 'LA'):
+        return True
+    try:
+        rgb = im.convert('RGB')
+        s = rgb.resize((min(64, rgb.size[0]), min(64, rgb.size[1])))
+        px = list(s.getdata())
+        step = max(1, len(px) // 400)
+        for r, g, b in px[::step]:
+            if abs(r - g) > 14 or abs(g - b) > 14 or abs(r - b) > 14:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _shrink_image(blob, src_partname):
+    """压缩图片体积：超宽图等比缩小 + 统一重压 PNG
+
+    实测源文件里的图**质量参差**：有 1890×784 却 2.2MB 的不压缩 TIFF，
+    也有 475×201 却 375KB 的近乎裸存 PNG（3.9 字节/像素）。
+    不处理的话合订本 docx 34MB / PDF 73MB，打印店上传常常超限。
+    只在压完更小时才采用；解析失败（EMF/WMF）原样返回走回退路径。
+    """
+    ext = os.path.splitext(str(src_partname))[1].lstrip('.').lower()
+    try:
+        im = Image.open(io.BytesIO(blob))
+        w, h = im.size
+    except Exception:
+        return blob, ext
+    if w > _MAX_FIG_PX:
+        im = im.resize((_MAX_FIG_PX, max(1, int(h * _MAX_FIG_PX / float(w)))), Image.LANCZOS)
+    buf = io.BytesIO()
+    try:
+        if _looks_gray(im):
+            im.convert('L').save(buf, 'PNG', optimize=True)
+        else:
+            im.convert('RGB').save(buf, 'PNG', optimize=True)
+    except Exception:
+        return blob, ext
+    out = buf.getvalue()
+    return (out, 'png') if len(out) < len(blob) else (blob, ext)
+
+
+def _image_rid(dst_doc, blob, src_partname):
+    """把图片加入目标文档并返回新 rId
+
+    ① 先压缩：TIFF 转 PNG、超宽图缩到 _MAX_FIG_PX（否则合订本 PDF 会到 70MB+）
+    ② 优先走 python-docx 标准路径 get_or_add_image：按内容 SHA1 去重、自动分配唯一部件名，
+       避免「不同源文档的 imageNN.png 重名」导致打包出现 Duplicate name
+    ③ EMF/WMF 等 python-docx 不认识的格式会抛 UnrecognizedImageError，走手动建部件的回退路径
+    """
+    blob, ext = _shrink_image(blob, src_partname)
+    try:
+        rId, _ = dst_doc.part.get_or_add_image(io.BytesIO(blob))
+        return rId
+    except Exception:
+        pass
+    pkg = dst_doc.part.package
+    if not ext:
+        ext = 'bin'
+    partname = pkg.next_partname('/word/media/image%d.' + ext)
+    ct = _IMG_FALLBACK.get(ext, 'application/octet-stream')
+    part = Part(partname, ct, blob, pkg)
+    return dst_doc.part.relate_to(part, RT.IMAGE)
+
+
+def fix_image_rids(el, src_doc, dst_doc):
+    """复制过来的图片，r:embed / r:id 指向源文档的关系 id，必须换成目标文档的"""
+    for blip in el.iter(A + 'blip'):
+        rid = blip.get(R + 'embed')
+        if rid:
+            rel = src_doc.part.rels.get(rid)
+            if rel is not None and not rel.is_external:
+                tp = rel.target_part
+                blip.set(R + 'embed', _image_rid(dst_doc, tp.blob, tp.partname))
+        if blip.get(R + 'link') is not None:
+            blip.attrib.pop(R + 'link', None)      # 外链图不跟随，去掉链接
+    for imd in el.iter(V + 'imagedata'):           # VML 老式图片
+        rid = imd.get(R + 'id')
+        if rid:
+            rel = src_doc.part.rels.get(rid)
+            if rel is not None and not rel.is_external:
+                tp = rel.target_part
+                imd.set(R + 'id', _image_rid(dst_doc, tp.blob, tp.partname))
+
+
+def anchor_to_inline(drawing):
+    """浮动图（wp:anchor）转内嵌图（wp:inline），否则搬运后会压字"""
+    anc = None
+    for child in drawing:
+        if child.tag == WP + 'anchor':
+            anc = child
+            break
+    if anc is None:
+        return
+    inl = OxmlElement('wp:inline')
+    for k in ('distT', 'distB', 'distL', 'distR'):
+        v = anc.get(qn('wp:' + k))
+        if v:
+            inl.set(qn('wp:' + k), v)
+    for child in anc:
+        if child.tag in (WP + 'extent', WP + 'effectExtent', WP + 'docPr',
+                         WP + 'cNvGraphicFramePr', A + 'graphic'):
+            inl.append(copy.deepcopy(child))
+    drawing.remove(anc)
+    drawing.append(inl)
+
+
+def scale_drawing(drawing, max_cm):
+    """宽度超栏宽的图片等比缩到栏宽"""
+    max_emu = int(max_cm * EMU_CM)
+    ext = drawing.find('.//' + WP + 'extent')
+    if ext is None:
+        return
+    try:
+        cx, cy = int(ext.get('cx') or 0), int(ext.get('cy') or 0)
+    except ValueError:
+        return
+    if cx <= 0 or cx <= max_emu:
+        return
+    r = max_emu / float(cx)
+    ncx, ncy = int(cx * r), int(cy * r)
+    for node in drawing.iter(WP + 'extent'):
+        node.set('cx', str(ncx)); node.set('cy', str(ncy))
+    for node in drawing.iter(A + 'ext'):
+        node.set('cx', str(ncx)); node.set('cy', str(ncy))
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,6 +225,8 @@ COLS = 2
 PAPER = 'a4'
 MARGIN_LR = 0.8
 MARGIN_TB = 0.4
+# 图片最大宽度：A4 双栏 0.8cm 边距时栏宽 9.4cm，留点余量
+COL_W_CM = 8.8
 OUT_NAME = '物理解析合集_小册子.docx'
 
 
@@ -140,7 +325,9 @@ def extract_entries_rich(path, region='all'):
       'practice' 「课时精练」及之后 —— 小本（81 练）；无精练的篇返回 []
     """
     doc = Document(path)
-    paras = [p for p in doc.paragraphs if p.text.strip()]
+    allp = list(doc.paragraphs)                       # 全量段落（含“纯图无字”的段）
+    pos = [i for i, p in enumerate(allp) if p.text.strip()]   # 非空段在全量里的下标
+    paras = [allp[i] for i in pos]
     if region != 'all':
         cut = split_boundary(paras)
         if cut is None:
@@ -148,15 +335,16 @@ def extract_entries_rich(path, region='all'):
                 return []
             # 微点突破 / 阶段复习 无精练 → 整篇归大本
         elif region == 'main':
-            paras = paras[:cut]
+            paras, pos = paras[:cut], pos[:cut]
         else:
-            paras = paras[cut:]
+            paras, pos = paras[cut:], pos[cut:]
     texts = [p.text.strip() for p in paras]
     entries = []
     i, n = 0, len(texts)
     while i < n:
         t = texts[i]
         if MP.is_question_start(texts, i, allow_sub=True):
+            qs = i
             qnum = MP.collect_qnum(t)
             m_src = MP.RE_SRC.search(t)
             src = m_src.group(0) if m_src else ''
@@ -177,9 +365,12 @@ def extract_entries_rich(path, region='all'):
                     break
                 j += 1
             if ki:
+                # 题图/选项图在题首到解析段之间，解析文字会引用它们（“如图甲所示”）
                 entries.append({'num': qnum, 'src': src,
                                 'texts': [texts[k] for k in ki],
-                                'paras': [paras[k] for k in ki]})
+                                'paras': [paras[k] for k in ki],
+                                'imgs': collect_images(allp, pos[qs], pos[ki[-1]]),
+                                'srcdoc': doc})
             i = j
             continue
         if MP.is_keeper_line(t):
@@ -189,7 +380,7 @@ def extract_entries_rich(path, region='all'):
                 ki.append(j)
                 j += 1
             entries.append({'num': '', 'src': '', 'texts': [texts[k] for k in ki],
-                            'paras': [paras[k] for k in ki]})
+                            'paras': [paras[k] for k in ki], 'imgs': [], 'srcdoc': doc})
             i = j
             continue
         i += 1
@@ -206,27 +397,43 @@ def _new_para(doc):
     return p
 
 
-def copy_para_into(dst_p, src_p):
-    """把源段落的内容（run + OMML 公式 + 超链接）原样复制到目标段落"""
+def copy_para_into(dst_p, src_p, src_doc=None, dst_doc=None):
+    """把源段落的内容（run + OMML 公式 + 超链接 + 内嵌图）原样复制到目标段落"""
     for child in src_p._element:
         if child.tag in COPY_TAGS:
-            dst_p._element.append(copy.deepcopy(child))
+            new = copy.deepcopy(child)
+            if src_doc is not None and dst_doc is not None:
+                for d in new.iter(W + 'drawing'):
+                    anchor_to_inline(d)
+                fix_image_rids(new, src_doc, dst_doc)
+            dst_p._element.append(new)
 
 
 def render_entry(doc, entry):
     ps = entry.get('paras') or []
     if not ps:
         return
+    sd = entry.get('srcdoc')
     # 首行：题号+来源（加粗） + 源段落内容
     p = _new_para(doc)
     head = (entry['num'] or '') + (entry.get('src') or '')
     if head:
         rn = p.add_run(head + ' ')
         MP.set_font(rn, MP.BODY_FONT, MP.BODY_SIZE, bold=True)
-    copy_para_into(p, ps[0])
+    copy_para_into(p, ps[0], sd, doc)
+    # 题图 / 选项图：插在“答案”之后、“解析”之前，正是原书里图的位置
+    for d in entry.get('imgs') or []:
+        ip = _new_para(doc)
+        ip.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        nd = copy.deepcopy(d)
+        anchor_to_inline(nd)
+        if sd is not None:
+            fix_image_rids(nd, sd, doc)
+        scale_drawing(nd, COL_W_CM)
+        ip._element.append(nd)
     # 续段：逐段原样复制
     for sp in ps[1:]:
-        copy_para_into(_new_para(doc), sp)
+        copy_para_into(_new_para(doc), sp, sd, doc)
 
 
 def render_toc_line(doc, idx, title):
@@ -312,7 +519,7 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
     _toc_block(doc, [(t, t) for _c, t, _f in items], toc_title)
     FM.new_page_section(doc, cols=COLS, numbered=True, restart=1)
 
-    n_entries = n_ans = n_ana = 0
+    n_entries = n_ans = n_ana = n_fig = 0
     order = ['%s 拼装顺序' % toc_title, '=' * 56]
     cur_chap = None
     for chap, title, fpath in items:
@@ -325,6 +532,7 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
         for e in es:
             n_ans += sum(1 for x in e['texts'] if MP.RE_ANSWER.match(x))
             n_ana += sum(1 for x in e['texts'] if MP.RE_ANALYSIS.match(x))
+            n_fig += len(e.get('imgs') or [])
             render_entry(doc, e)
         order.append('  %02d. %-44s <- %s' % (len(order), title, os.path.basename(fpath)))
 
@@ -334,8 +542,8 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
          '%d %s · %d 条目' % (len(items), '章' if region == 'main' else '练', n_entries))])
     FM.enable_even_odd_headers(doc)
     saved = MP.save_doc(doc, out_name)
-    print('%s: %s  章/练 %d  条目 %d  答案 %d  解析 %d'
-          % (region, os.path.basename(saved), len(items), n_entries, n_ans, n_ana))
+    print('%s: %s  章/练 %d  条目 %d  答案 %d  解析 %d  插图 %d'
+          % (region, os.path.basename(saved), len(items), n_entries, n_ans, n_ana, n_fig))
     return items, n_entries, n_ans, n_ana, order
 
 
