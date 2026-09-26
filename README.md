@@ -6,7 +6,19 @@
 
 ---
 
-## 一、做了什么
+## 一、为什么做这个
+
+学校发的那本答案解析，**不是每道题都有详细解析的** —— 大约只有一半题目带解析，前面几道基础题常常只给个答案、没有解题过程。对着错题想不通的时候，就卡在那里了。
+
+老师手上的**教师用书 Word 版有全部解析**。但整本打印不现实：里面有大量题干、选项、知识梳理、图表，一科就上千页，印出来又厚又贵——而真正要看的，只有那几行答案和解析。
+
+所以这个项目的目标很单纯：
+
+> **把「答案 + 解析」从教师用书里挑出来，单独印成薄册子。**
+
+结果是把 2245 页的教师用书，压成 272 页的解析册——**要查的东西一页都不少，不要的东西一行都不留。**
+
+## 二、做了什么
 
 教师用书每篇讲义的结构是「知识梳理 → 例题 → 答案/解析 → 课时精练 → 答案/解析」，
 答案和解析夹在大量讲解、题干、选项、图表中间，**要对着找很费劲**。
@@ -27,7 +39,7 @@
    大本解析 + 小本解析 + 合订本（三份可打印文档）
 ```
 
-## 二、成果
+## 三、成果
 
 ### 生物（高中生物 步步高 大一轮·广东版）
 
@@ -51,7 +63,7 @@
 
 **957 页 → 115 页，缩减 88.0%。**
 
-## 三、几个有意思的技术点
+## 四、几个有意思的技术点
 
 ### 1. 找回「读不到」的内容
 
@@ -137,19 +149,34 @@ fill_toc_pages.py     把实测页码回填目录的 00 占位
 > 教训：**报出异常时，先自证口径。** 一个自相矛盾的指标（比如"覆盖率 86%"却"缺失 0 条"）
 > 往往说明测量方法错了，而不是被测对象有问题。
 
-## 四、架构图
+## 五、架构图
 
-[`架构图/teacher-docx-pipeline.html`](架构图/teacher-docx-pipeline.html) —— 交互式流水线架构图（可离线打开）
+两科流水线**形状相同、难点不同**：生物要处理的是 EQ 域（化学式的堆叠上下标，`python-docx` 读不到），物理要处理的是 OMML 公式对象（物理解析没有公式基本不可读）。
 
-![pipeline](架构图/teacher-docx-pipeline.light.png)
+### 生物
 
-## 五、目录结构
+[`架构图/biology-pipeline.html`](架构图/biology-pipeline.html) —— 交互式架构图（下载后离线打开）
+
+![生物流水线](架构图/biology-pipeline.light.png)
+
+### 物理
+
+[`架构图/physics-pipeline.html`](架构图/physics-pipeline.html) —— 交互式架构图（下载后离线打开）
+
+![物理流水线](架构图/physics-pipeline.light.png)
+
+> GitHub 不渲染仓库里的 `.html`，点开会是源码。想看可交互版本：下载后用浏览器打开，
+> 或开启 GitHub Pages 后访问 `https://439909208.github.io/Review-Analysis/架构图/physics-pipeline.html`。
+
+## 六、目录结构
 
 ```
 一轮复习资料解析提取/
 ├── 生物解析/脚本/         26 个（Python 22 + PowerShell 4）
 ├── 物理解析/脚本/         17 个（Python 13 + PowerShell 4）
-└── 架构图/                交互式架构图 + 源定义 + 图片
+└── 架构图/
+    ├── biology-pipeline.html / .light.png / .dark.png / .architecture.json
+    └── physics-pipeline.html / .light.png / .dark.png / .architecture.json
 ```
 
 **生物核心脚本**
@@ -171,7 +198,7 @@ fill_toc_pages.py     把实测页码回填目录的 00 占位
 | `export_titles_physics.py` → `wps_pagemap_physics.ps1` → `fill_toc_pages_physics.py` | 三本页码闭环 |
 | `audit_physics.py` / `verify_output.py` | 审计与回读验证 |
 
-## 六、运行
+## 七、运行
 
 依赖：**Python 3.11**（`python-docx`、`lxml`）+ **WPS Office**（COM，用于页码实测；Word 同理，改 ProgID 即可）。
 
@@ -200,7 +227,7 @@ param([string]$root = (Get-Location).Path)   # cd 到项目文件夹直接跑，
 > 注意：Windows PowerShell 5.1 读取含中文的 `.ps1` **必须 UTF-8 with BOM**，
 > 否则中文会变乱码且报诡异的语法错误。
 
-## 七、说明
+## 八、说明
 
 - 本仓库**只包含我自己写的代码与架构图**。
 - **不含**《步步高 大一轮》的原始讲义、课件或提取后的成品文档 ——

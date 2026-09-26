@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "高中物理《步步高》解析合册 — 项目架构",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "main-path", "label": "主链路：抽取 → 建册 → 实测 → 回填", "focus": ["docs", "kernel", "build", "wps", "fill", "books"], "note": "94 篇课时 docx 只读进内核，建册出三本，页码由 WPS 实测后回填。" },
+      { "id": "rules", "label": "规则来源与单一判定源", "focus": ["docs", "probe", "toc", "kernel", "audit"], "note": "先探明段落流形态，再让建册与审计共用同一套正则判定。" },
+      { "id": "evidence", "label": "审计与证据落盘", "focus": ["kernel", "audit", "evidence", "books"], "note": "审计差值为 0 才放行；报告、页码清单、预览图全部落盘可复查。" }
+    ]
+  },
+  "components": [
+    { "id": "toc", "type": "database", "label": "教师目录.docx", "sublabel": "16 章 · 101 目录行", "tag": "同源合并 7 处", "pos": [60, 100], "size": [190, 90] },
+    { "id": "probe", "type": "backend", "label": "形态探明", "sublabel": "probe / scan 段落流", "tag": "先探结构再写规则", "pos": [385, 100], "size": [190, 90] },
+    { "id": "docs", "type": "database", "label": "课时 docx × 94", "sublabel": "课时81 · 微点8 · 阶段复习5", "tag": "只读", "pos": [60, 305], "size": [190, 90] },
+    { "id": "kernel", "type": "backend", "label": "抽取内核", "sublabel": "merge_physics.py", "tag": "白名单·前瞻·续段链", "pos": [385, 305], "size": [190, 90] },
+    { "id": "build", "type": "backend", "label": "建册与渲染", "sublabel": "merge_physics_v2.py · XML 复制公式", "tag": "分区 + 复制公式", "pos": [710, 305], "size": [190, 90] },
+    { "id": "wps", "type": "external", "label": "WPS 实测页码", "sublabel": "KWPS COM 逐段定位", "tag": "非估算", "pos": [1035, 305], "size": [190, 90] },
+    { "id": "audit", "type": "backend", "label": "审计与验证", "sublabel": "audit / coverage / stats", "tag": "差值 0 才放行", "pos": [60, 510], "size": [190, 90] },
+    { "id": "evidence", "type": "database", "label": "证据存档", "sublabel": "审计 txt · pagemap 清单", "tag": "全部落盘", "pos": [385, 510], "size": [190, 90] },
+    { "id": "fill", "type": "backend", "label": "目录回填", "sublabel": "fill_toc_pages_physics.py", "tag": "00 → 实测页码", "pos": [710, 510], "size": [190, 90] },
+    { "id": "books", "type": "database", "label": "三本解析册", "sublabel": "大本 53 · 小本 62 · 合订本 115", "tag": "docx + PDF 预览", "pos": [1035, 510], "size": [190, 90] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "只读输入 · 脚本从不改写原文", "wraps": ["toc", "docs"] },
+    { "kind": "region", "label": "本机 WPS Office · 页码只能实测", "wraps": ["wps"] },
+    { "kind": "region", "label": "审计与证据 · 全部落盘可复查", "wraps": ["audit", "evidence"] },
+    { "kind": "region", "label": "交付产物 · A4 双面打印", "wraps": ["books"] }
+  ],
+  "connections": [
+    { "id": "docs-to-kernel", "from": "docs", "to": "kernel", "label": "只读遍历 94 篇", "variant": "emphasis" },
+    { "id": "toc-to-kernel", "from": "toc", "to": "kernel", "label": "目录顺序", "fromSide": "right", "toSide": "top" },
+    { "id": "probe-to-kernel", "from": "probe", "to": "kernel", "label": "结构样本定规则", "toSide": "top", "labelDy": 30 },
+    { "id": "kernel-to-build", "from": "kernel", "to": "build", "label": "条目 + 源段落对象", "variant": "emphasis" },
+    { "id": "build-to-wps", "from": "build", "to": "wps", "label": "三本 docx 初稿", "variant": "emphasis" },
+    { "id": "wps-to-fill", "from": "wps", "to": "fill", "label": "实测页码", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "id": "fill-to-books", "from": "fill", "to": "books", "label": "00 → 实测页码", "variant": "emphasis" },
+    { "id": "kernel-to-audit", "from": "kernel", "to": "audit", "label": "复用同一套正则", "fromSide": "bottom", "toSide": "top" },
+    { "id": "audit-to-evidence", "from": "audit", "to": "evidence", "label": "审计报告 + 覆盖率" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "单一判定源", "items": ["建册与审计共用 merge_physics.py 的同一套正则，修一处全链路生效", "前瞻结构法：数字行后先见「答案/解析」才算题，避开 1.质点 误判", "续段链：上一段不以句末标点结尾就继续收，编号递增并入"] },
+    { "dot": "emerald", "title": "实测而非估算", "items": ["目录页码由 WPS COM 逐段实测（Information(3)）后回填 00 占位", "小本标题改写为「练N」，避免合订本与大本标题撞键串页", "页数实测：大本 53 + 小本 62 = 合订本 115 页，分毫不差"] },
+    { "dot": "violet", "title": "审计先行 · 已知边界", "items": ["原文 答案 1262 / 解析 1194 行，抽取差值 0；条目 1266，带锚点 1256（99.2%）", "原始 94 篇 957 页 → 合订本 115 页（−88.0%）", "边界：阶段复习 5 篇题面在图/表中（10 条无锚点，内容不丢）；图片内文字不可读"] }
+  ]
+}
