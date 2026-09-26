@@ -29,14 +29,24 @@ BOOKS = [
 
 
 def load_map(path):
+    """返回 (页码表, 前置偏移)
+
+    pagemap 里 WPS 给的是**物理页**；封面/说明/目录不编号、正文从 1 重新开始，
+    故显示页 = 物理页 - 偏移。偏移由 wps_pagemap_physics.ps1 以 '__OFFSET__|n' 写入。
+    """
     m = {}
+    offset = 0
     with open(path, encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if '|' in line:
                 k, v = line.rsplit('|', 1)
-                m[k.strip().lstrip('\ufeff')] = int(v)
-    return m
+                k = k.strip().lstrip('\ufeff')
+                if k == '__OFFSET__':
+                    offset = int(v)
+                    continue
+                m[k] = int(v)
+    return m, offset
 
 
 def load_entries(path):
@@ -51,7 +61,7 @@ def load_entries(path):
 
 
 def fill(docx_path, map_path, ent_path):
-    page = load_map(map_path)
+    page, offset = load_map(map_path)
     entries = load_entries(ent_path)
     doc = Document(docx_path)
     toc = [p for p in doc.paragraphs if re.match(r'^\d{2,3}\. .*\t\d+$', p.text)]
@@ -62,6 +72,10 @@ def fill(docx_path, map_path, ent_path):
     for p, (disp, head) in zip(toc, entries):
         pg = page.get(head)
         if not pg or pg <= 0:
+            missed.append((disp, head))
+            continue
+        pg = pg - offset                    # 物理页 → 显示页
+        if pg < 1:
             missed.append((disp, head))
             continue
         for r in reversed(p.runs):

@@ -31,12 +31,21 @@ function Get-PageMap($docxPath, $titlesPath, $outPath) {
         }
     }
     $doc.Close($false)
-    $lines = @()
+    # 前置页偏移：封面/说明/目录不编号，正文从 1 重新开始。
+    # WPS 的 Information(1)（adjusted）对分节后的页一律返回 1，不可用；
+    # Information(3) 返回物理页。故：显示页 = 物理页 - 偏移，
+    # 偏移 = 正文首个标题的物理页 - 1（目录占几页都能自适应）。
+    $pos = @($titles.Values | Where-Object { $_ -gt 0 })
+    $offset = 0
+    if ($pos.Count -gt 0) {
+        $offset = (($pos | Measure-Object -Minimum).Minimum) - 1
+    }
+    $lines = @('__OFFSET__|' + $offset)
     foreach ($key in $titles.Keys) {
         $lines += ('{0}|{1}' -f $key, $titles[$key])
     }
     $lines | Out-File $outPath -Encoding UTF8
-    Write-Output ('map done: ' + (Split-Path $docxPath -Leaf))
+    Write-Output ('map done: ' + (Split-Path $docxPath -Leaf) + '  前置偏移=' + $offset)
 }
 
 $items = @(

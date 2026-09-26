@@ -166,7 +166,7 @@ fill_toc_pages.py     把实测页码回填目录的 00 占位
 ![物理流水线](架构图/physics-pipeline.light.png)
 
 > GitHub 不渲染仓库里的 `.html`，点开会是源码。想看可交互版本：下载后用浏览器打开，
-> 或开启 GitHub Pages 后访问 `https://439909208.github.io/Review-Analysis/架构图/physics-pipeline.html`。
+> 或开启 GitHub Pages 后访问 `https://junpulsar.github.io/Review-Analysis/架构图/physics-pipeline.html`。
 
 ## 六、目录结构
 

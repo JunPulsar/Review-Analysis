@@ -29,6 +29,7 @@ import richtext as RT
 import extract_rich as ER
 import merge_jiexi as MJ
 import merge_book_order as MBO
+import frontmatter as FM
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 # 所有成册产物统一收在「成册解析」一个文件夹内
@@ -115,7 +116,7 @@ def build_page(doc):
     style.paragraph_format.space_after = MJ.PARA_AFTER
     style.paragraph_format.line_spacing = LINE
     set_columns(doc, COLS)
-    MJ.setup_page_numbers(doc)
+    # 页脚由 frontmatter 按节管理（封面/说明/目录/版本记录无页码，正文外侧页码）
 
 
 def add_heading(doc, text, size, before=Pt(8), after=Pt(3), center=True, bold=True):
@@ -340,9 +341,14 @@ def main():
     # ── 大本 ──
     book = Document()
     build_page(book)
-    add_heading(book, '高中生物 解析合集（全书）', Pt(16), Pt(0), Pt(8))
+    FM.init_cover_section(book, cols=1, vcenter=True)
+    FM.build_cover(book, '生物')
+    FM.new_page_section(book, cols=1, numbered=False)
+    FM.build_colophon(book, '生物')
+    FM.new_page_section(book, cols=COLS, numbered=False)
+    add_heading(book, '目　录', Pt(16), Pt(0), Pt(8))
     render_toc(book, toc_items)
-    book.add_page_break()
+    FM.new_page_section(book, cols=COLS, numbered=True, restart=1)
     cur_day = None
     n_entry = 0
     for day, kind, num in plan:
@@ -352,6 +358,9 @@ def main():
         es = entries_of_chapter(path_of(day, kind, num))
         n_entry += len(es)
         render_chapter(book, title_of(day, kind, num), es)
+    FM.new_page_section(book, cols=1, numbered=False)
+    FM.build_version_page(book, '生物', [('大本解析', '%d 章 · %d 条目' % (len(plan), n_entry))])
+    FM.enable_even_odd_headers(book)
     p_book = save_doc(book, os.path.join(OUT_BOOK, '大本解析_全书.docx'))
     print('大本:', p_book, ' 章节', len(plan), ' 条目', n_entry)
 
@@ -381,7 +390,11 @@ def main():
 
     xb = Document()
     build_page(xb)
-    add_heading(xb, '高中生物 小本解析（限时练 · 强化练 · 周末必刷）', Pt(16), Pt(0), Pt(4))
+    FM.init_cover_section(xb, cols=1, vcenter=True)
+    FM.build_cover(xb, '生物')
+    FM.new_page_section(xb, cols=1, numbered=False)
+    FM.build_colophon(xb, '生物')
+    FM.new_page_section(xb, cols=COLS, numbered=False)
     add_heading(xb, '目　录', Pt(16), Pt(0), Pt(8))
     for i, (day, name, _f, kind) in enumerate(xb_items, 1):
         p = _tight(xb.add_paragraph())
@@ -393,7 +406,7 @@ def main():
         RT.set_font(p.add_run('%02d. %s' % (i, name)), BODY, SIZE)
         RT.set_font(p.add_run('\t'), BODY, SIZE)
         RT.set_font(p.add_run('00'), BODY, SIZE)
-    xb.add_page_break()
+    FM.new_page_section(xb, cols=COLS, numbered=True, restart=1)
 
     n_xb = 0
     cur_day = None
@@ -407,15 +420,20 @@ def main():
         es = ER.extract_entries(rp)
         n_xb += len(es)
         render_chapter(xb, name, es)
+    FM.new_page_section(xb, cols=1, numbered=False)
+    FM.build_version_page(xb, '生物', [('小本解析', '%d 篇 · %d 条目' % (len(xb_items), n_xb))])
+    FM.enable_even_odd_headers(xb)
     p_xb = save_doc(xb, os.path.join(OUT_XB, '小本解析_合集.docx'))
     print('小本:', p_xb, ' 篇数', len(xb_items), ' 条目', n_xb)
 
     # ── 合订本：先大本、后小本（供胶装打印）──
     cb = Document()
     build_page(cb)
-    add_heading(cb, '高中生物 解析合集', Pt(18), Pt(0), Pt(4))
-    add_heading(cb, '第一部分　大本解析（%d 章）　　第二部分　小本解析（%d 篇）'
-                % (len(plan), len(xb_items)), Pt(10.5), Pt(0), Pt(10))
+    FM.init_cover_section(cb, cols=1, vcenter=True)
+    FM.build_cover(cb, '生物')
+    FM.new_page_section(cb, cols=1, numbered=False)
+    FM.build_colophon(cb, '生物')
+    FM.new_page_section(cb, cols=COLS, numbered=False)
     add_heading(cb, '目　录', Pt(16), Pt(0), Pt(6))
     add_heading(cb, '第一部分　大本解析', Pt(12), Pt(6), Pt(2), center=False)
     idx = 0
@@ -426,7 +444,7 @@ def main():
     for day, name, _f, _k in xb_items:
         idx += 1
         _toc_line(cb, idx, name, width=3)
-    cb.add_page_break()
+    FM.new_page_section(cb, cols=COLS, numbered=True, restart=1)
 
     add_heading(cb, '第一部分　大本解析', Pt(16), Pt(0), Pt(8))
     cur_day = None
@@ -447,6 +465,13 @@ def main():
         if kind == 'prac':
             _m, rp = ER.split_practice(rp)
         render_chapter(cb, name, ER.extract_entries(rp))
+    FM.new_page_section(cb, cols=1, numbered=False)
+    FM.build_version_page(cb, '生物', [
+        ('大本解析', '%d 章 · %d 条目' % (len(plan), n_entry)),
+        ('小本解析', '%d 篇 · %d 条目' % (len(xb_items), n_xb)),
+        ('合订本', '%d 章篇 · %d 条目' % (len(plan) + len(xb_items), n_entry + n_xb)),
+    ])
+    FM.enable_even_odd_headers(cb)
     p_cb = save_doc(cb, os.path.join(OUT_DIR, '大本小本合订本.docx'))
     print('合订本:', p_cb, ' 共', len(plan) + len(xb_items), '章/篇 目录条目', idx)
 

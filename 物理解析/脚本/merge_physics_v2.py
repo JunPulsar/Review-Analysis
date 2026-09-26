@@ -29,6 +29,7 @@ from docx.oxml import OxmlElement
 from lxml import etree
 
 import merge_physics as MP          # 复用：全部正则、抽取判定、目录映射
+import frontmatter as FM            # 封面 / 说明页 / 版本记录（与生物项目共用）
 
 W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 M = '{http://schemas.openxmlformats.org/officeDocument/2006/math}'
@@ -111,7 +112,7 @@ def build_page(doc):
         rFonts = etree.SubElement(rPr, qn('w:rFonts'))
     rFonts.set(qn('w:eastAsia'), MP.BODY_FONT)
     set_columns(doc, COLS)
-    MP.setup_page_numbers(doc)
+    # 页脚由 frontmatter 按节管理（封面/说明/目录/版本记录无页码，正文外侧页码）
 
 
 # ────────────────────────── 抽取（返回源段落对象）──────────────────────────
@@ -303,9 +304,13 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
 
     doc = Document()
     build_page(doc)
-    MP.add_heading(doc, doc_title, Pt(16), Pt(0), Pt(8))
+    FM.init_cover_section(doc, cols=1, vcenter=True)
+    FM.build_cover(doc, '物理')
+    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.build_colophon(doc, '物理')
+    FM.new_page_section(doc, cols=COLS, numbered=False)
     _toc_block(doc, [(t, t) for _c, t, _f in items], toc_title)
-    doc.add_page_break()
+    FM.new_page_section(doc, cols=COLS, numbered=True, restart=1)
 
     n_entries = n_ans = n_ana = 0
     order = ['%s 拼装顺序' % toc_title, '=' * 56]
@@ -323,6 +328,11 @@ def build_book(ordered, region, doc_title, toc_title, out_name):
             render_entry(doc, e)
         order.append('  %02d. %-44s <- %s' % (len(order), title, os.path.basename(fpath)))
 
+    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.build_version_page(doc, '物理', [
+        ('大本解析' if region == 'main' else '小本解析',
+         '%d %s · %d 条目' % (len(items), '章' if region == 'main' else '练', n_entries))])
+    FM.enable_even_odd_headers(doc)
     saved = MP.save_doc(doc, out_name)
     print('%s: %s  章/练 %d  条目 %d  答案 %d  解析 %d'
           % (region, os.path.basename(saved), len(items), n_entries, n_ans, n_ana))
@@ -335,9 +345,11 @@ def build_combined(ordered, out_name):
 
     doc = Document()
     build_page(doc)
-    MP.add_heading(doc, '高中物理（步步高 大一轮·广东版）答案解析合集', Pt(18), Pt(0), Pt(4))
-    MP.add_heading(doc, '第一部分　大本解析（%d 章）　　第二部分　小本解析（%d 练）'
-                   % (len(big), len(small)), Pt(10.5), Pt(0), Pt(10))
+    FM.init_cover_section(doc, cols=1, vcenter=True)
+    FM.build_cover(doc, '物理')
+    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.build_colophon(doc, '物理')
+    FM.new_page_section(doc, cols=COLS, numbered=False)
     MP.add_heading(doc, '目　录', Pt(16), Pt(0), Pt(6))
     MP.add_heading(doc, '第一部分　大本解析', MP.TOC_SIZE, Pt(6), Pt(2), center=False)
     i = 0
@@ -348,7 +360,7 @@ def build_combined(ordered, out_name):
     for _c, t, _f in small:
         i += 1
         render_toc_line(doc, i, t)
-    doc.add_page_break()
+    FM.new_page_section(doc, cols=COLS, numbered=True, restart=1)
 
     n = 0
     for part, items, region in (('第一部分　大本解析', big, 'main'),
@@ -365,6 +377,12 @@ def build_combined(ordered, out_name):
             for e in extract_entries_rich(os.path.join(ROOT, fpath), region):
                 render_entry(doc, e)
                 n += 1
+    FM.new_page_section(doc, cols=1, numbered=False)
+    FM.build_version_page(doc, '物理', [
+        ('大本解析', '%d 章' % len(big)),
+        ('小本解析', '%d 练' % len(small)),
+        ('合订本', '%d 章练 · %d 条目' % (len(big) + len(small), n))])
+    FM.enable_even_odd_headers(doc)
     saved = MP.save_doc(doc, out_name)
     print('combined: %s  目录 %d 条  条目 %d' % (os.path.basename(saved), i, n))
     return saved

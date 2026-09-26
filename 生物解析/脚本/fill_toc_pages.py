@@ -10,19 +10,28 @@ TMP = os.path.join(ROOT, '_toc_tmp')
 
 
 def load_map(path):
+    """返回 (页码表, 前置偏移)
+
+    pagemap 文件里 WPS 给的是**物理页**；封面/说明/目录不编号、正文从 1 重新开始，
+    所以显示页 = 物理页 - 偏移。偏移由 wps_pagemap 脚本以 '__OFFSET__|n' 写入。
+    """
     m = {}
+    offset = 0
     with open(path, encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if '|' in line:
                 k, v = line.rsplit('|', 1)
                 k = k.strip().lstrip('\ufeff')
+                if k == '__OFFSET__':
+                    offset = int(v)
+                    continue
                 m[k] = int(v)
-    return m
+    return m, offset
 
 
 def fill(docx_path, pagemap_path):
-    page = load_map(pagemap_path)
+    page, offset = load_map(pagemap_path)
     doc = Document(docx_path)
     n = 0
     for p in doc.paragraphs:
@@ -34,18 +43,22 @@ def fill(docx_path, pagemap_path):
         if title not in page:
             print(f'  未找到页码: {title}')
             continue
+        pg = page[title] - offset          # 物理页 → 显示页
+        if pg < 1:
+            print(f'  页码异常(偏移 {offset}): {title} -> {page[title]}')
+            continue
         # 把最后 run（占位 00）改掉
         runs = [r for r in p.runs]
         if not runs:
             continue
         # 最后 run 可能是 '00'，也可能是 '\t' + '00' 拆分成两个 run
         if runs[-1].text == '00':
-            runs[-1].text = str(page[title])
+            runs[-1].text = str(pg)
         else:
             # 兜底：拼一个新 run
             for r in runs:
                 if r.text == '00':
-                    r.text = str(page[title])
+                    r.text = str(pg)
                     break
         n += 1
     if n:
