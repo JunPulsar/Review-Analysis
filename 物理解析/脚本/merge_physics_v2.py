@@ -365,11 +365,22 @@ def extract_entries_rich(path, region='all'):
                     break
                 j += 1
             if ki:
-                # 题图/选项图在题首到解析段之间，解析文字会引用它们（“如图甲所示”）
+                # 只带「解析自己的图」，范围为【首个 答案/解析 段 → 链末(含其后连续纯图段)】。
+                # 图有两种摆法，都要覆盖：
+                #   ① 夹在解析中间：[解析] 对C受力分析如图，→ [★图] → [续段] 由相似三角形可知…
+                #   ② 摆在解析下面：[解析] …如图甲…如图乙… → [★图甲][★图乙] → 下一段
+                # 范围到链末后，只继续吞「纯图片段」（无文字），一遇到有文字的段立刻停 ——
+                # 否则会把后面「方法总结框」「下一节」的图也算进来。
+                # 题图在「题首之后、答案之前」，不在范围内，自然排除。
+                end_all = pos[ki[-1]]
+                k2 = end_all + 1
+                while k2 < len(allp) and not allp[k2].text.strip():
+                    end_all = k2
+                    k2 += 1
                 entries.append({'num': qnum, 'src': src,
                                 'texts': [texts[k] for k in ki],
                                 'paras': [paras[k] for k in ki],
-                                'imgs': collect_images(allp, pos[qs], pos[ki[-1]]),
+                                'imgs': collect_images(allp, pos[ki[0]], end_all),
                                 'srcdoc': doc})
             i = j
             continue
@@ -380,7 +391,9 @@ def extract_entries_rich(path, region='all'):
                 ki.append(j)
                 j += 1
             entries.append({'num': '', 'src': '', 'texts': [texts[k] for k in ki],
-                            'paras': [paras[k] for k in ki], 'imgs': [], 'srcdoc': doc})
+                            'paras': [paras[k] for k in ki],
+                            'imgs': collect_images(allp, pos[ki[0]], pos[ki[-1]]),
+                            'srcdoc': doc})
             i = j
             continue
         i += 1
