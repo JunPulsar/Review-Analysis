@@ -2,52 +2,437 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "教师 Word 文档 · 解析整理项目架构",
-    "output": "teacher-docx-pipeline.html",
+    "title": "高中生物《步步高》解析合册 — 项目架构",
+    "output": "biology-pipeline.html",
     "quality_profile": "showcase",
     "views": [
-      { "id": "rich-chain", "label": "富文本链路", "focus": ["src", "richtext", "extract_rich", "build_books"], "note": "域与上下标感知读取，条目连同区域归属一起抽出来。" },
-      { "id": "split", "label": "大本 / 小本分流", "focus": ["extract_rich", "daben", "xiaoben"], "note": "主干区进大本，练习区段进小本；1141 + 681 = 1822 条。" },
-      { "id": "page-loop", "label": "真实页码闭环", "focus": ["daben", "toc_export", "wps_com", "toc_fill"], "note": "目录先占位 00，再由 WPS COM 实测页码回填。" },
-      { "id": "legacy", "label": "旧链路并存", "focus": ["legacy", "audit"], "note": "旧口径产物与审计工具未重生成，仍可复跑对照。" }
+      {
+        "id": "rich-chain",
+        "label": "富文本链路",
+        "focus": [
+          "src",
+          "richtext",
+          "extract_rich",
+          "build_books"
+        ],
+        "note": "域与上下标感知读取，条目连同区域归属一起抽出来。"
+      },
+      {
+        "id": "split",
+        "label": "大本 / 小本分流",
+        "focus": [
+          "extract_rich",
+          "daben",
+          "xiaoben"
+        ],
+        "note": "主干区进大本，练习区段进小本；1141 + 681 = 1822 条。"
+      },
+      {
+        "id": "page-loop",
+        "label": "真实页码闭环",
+        "focus": [
+          "daben",
+          "toc_export",
+          "wps_com",
+          "toc_fill"
+        ],
+        "note": "目录先占位 00，再由 WPS COM 实测页码回填。"
+      },
+      {
+        "id": "legacy",
+        "label": "旧链路并存",
+        "focus": [
+          "legacy",
+          "audit"
+        ],
+        "note": "旧口径产物与审计工具未重生成，仍可复跑对照。"
+      }
     ]
   },
   "components": [
-    { "id": "src", "type": "database", "label": "原始讲义库", "sublabel": "97 篇 docx · 9 大概念", "pos": [40, 380], "size": [150, 64] },
-    { "id": "richtext", "type": "backend", "label": "富文本读取", "sublabel": "EQ 域 + 上下标", "tag": "新增", "pos": [290, 380], "size": [150, 64] },
-    { "id": "extract_rich", "type": "backend", "label": "区域切分抽取", "sublabel": "主干区 / 练习区段", "tag": "新增", "pos": [540, 380], "size": [150, 64] },
-    { "id": "build_books", "type": "backend", "label": "成册排版", "sublabel": "A4 双栏 · 0.8cm", "tag": "新增", "pos": [790, 380], "size": [150, 64] },
-    { "id": "merge_jiexi", "type": "backend", "label": "判定谓词内核", "sublabel": "题号 · 续段 · 判断题", "pos": [540, 140], "size": [150, 64] },
-    { "id": "daben", "type": "database", "label": "大本解析_全书", "sublabel": "75 章 · 80 页 · 1141 条", "pos": [1040, 300], "size": [150, 64] },
-    { "id": "xiaoben", "type": "database", "label": "小本解析_合集", "sublabel": "79 篇 · 77 页 · 681 条", "pos": [1040, 500], "size": [150, 64] },
-    { "id": "toc_export", "type": "backend", "label": "章节标题导出", "sublabel": "13pt 加粗标题", "pos": [1310, 300], "size": [150, 64] },
-    { "id": "wps_com", "type": "external", "label": "WPS COM 实测页", "sublabel": "ComputeStatistics(2)", "pos": [1310, 500], "size": [150, 64] },
-    { "id": "toc_fill", "type": "backend", "label": "目录页码回填", "sublabel": "00 占位 → 实测值", "pos": [1310, 700], "size": [150, 64] },
-    { "id": "legacy", "type": "backend", "label": "旧链路并存", "sublabel": "未重生成 · 旧口径", "pos": [40, 640], "size": [150, 64] },
-    { "id": "audit", "type": "security", "label": "审计工具链", "sublabel": "只读全量差分", "tag": "只读", "pos": [290, 640], "size": [150, 64] }
+    {
+      "id": "src",
+      "type": "database",
+      "label": "原始讲义库",
+      "sublabel": "97 篇 docx · 9 大概念",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "richtext",
+      "type": "backend",
+      "label": "富文本读取",
+      "sublabel": "EQ 域 + 上下标",
+      "tag": "新增",
+      "pos": [
+        290,
+        380
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "extract_rich",
+      "type": "backend",
+      "label": "区域切分抽取",
+      "sublabel": "主干区 / 练习区段",
+      "tag": "新增",
+      "pos": [
+        540,
+        380
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "build_books",
+      "type": "backend",
+      "label": "成册排版",
+      "sublabel": "A4 双栏 · 0.8cm",
+      "tag": "新增",
+      "pos": [
+        790,
+        380
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "merge_jiexi",
+      "type": "backend",
+      "label": "判定谓词内核",
+      "sublabel": "题号 · 续段 · 判断题",
+      "pos": [
+        540,
+        140
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "daben",
+      "type": "database",
+      "label": "大本解析_全书",
+      "sublabel": "75 章 · 80 页 · 1141 条",
+      "pos": [
+        1040,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "xiaoben",
+      "type": "database",
+      "label": "小本解析_合集",
+      "sublabel": "79 篇 · 77 页 · 681 条",
+      "pos": [
+        1040,
+        500
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "toc_export",
+      "type": "backend",
+      "label": "章节标题导出",
+      "sublabel": "13pt 加粗标题",
+      "pos": [
+        1310,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "wps_com",
+      "type": "external",
+      "label": "WPS COM 实测页",
+      "sublabel": "ComputeStatistics(2)",
+      "pos": [
+        1310,
+        500
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "toc_fill",
+      "type": "backend",
+      "label": "目录页码回填",
+      "sublabel": "00 占位 → 实测值",
+      "pos": [
+        1310,
+        700
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "legacy",
+      "type": "backend",
+      "label": "旧链路并存",
+      "sublabel": "未重生成 · 旧口径",
+      "pos": [
+        40,
+        640
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "audit",
+      "type": "security",
+      "label": "审计工具链",
+      "sublabel": "只读全量差分",
+      "tag": "只读",
+      "pos": [
+        290,
+        640
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
   ],
   "boundaries": [
-    { "kind": "region", "label": "富文本链路 · 本轮新增", "wraps": ["merge_jiexi", "richtext", "extract_rich", "build_books"] },
-    { "kind": "region", "label": "页码闭环 · WPS 实测", "wraps": ["toc_export", "wps_com", "toc_fill"] },
-    { "kind": "region", "label": "旧口径 · 未重生成", "wraps": ["legacy", "audit"] }
+    {
+      "kind": "region",
+      "label": "富文本链路 · 本轮新增",
+      "wraps": [
+        "merge_jiexi",
+        "richtext",
+        "extract_rich",
+        "build_books"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "页码闭环 · WPS 实测",
+      "wraps": [
+        "toc_export",
+        "wps_com",
+        "toc_fill"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "旧口径 · 未重生成",
+      "wraps": [
+        "legacy",
+        "audit"
+      ]
+    }
   ],
   "connections": [
-    { "id": "src-read", "from": "src", "to": "richtext", "label": "逐段读取", "variant": "emphasis", "route": "straight" },
-    { "id": "spans", "from": "richtext", "to": "extract_rich", "label": "Span 序列", "variant": "emphasis", "route": "straight" },
-    { "id": "predicates", "from": "merge_jiexi", "to": "extract_rich", "label": "复用判定谓词", "route": "straight", "fromSide": "bottom", "toSide": "top", "labelAt": [615, 292] },
-    { "id": "entries", "from": "extract_rich", "to": "build_books", "label": "抽取条目", "variant": "emphasis", "route": "straight" },
-    { "id": "to-daben", "from": "build_books", "to": "daben", "label": "主干区", "variant": "emphasis", "route": "straight", "fromSide": "right", "toSide": "left", "via": [[990, 412], [990, 332]] },
-    { "id": "to-xiaoben", "from": "build_books", "to": "xiaoben", "label": "练习区段", "variant": "emphasis", "route": "straight", "fromSide": "bottom", "toSide": "left", "via": [[865, 532]] },
-    { "id": "titles", "from": "daben", "to": "toc_export", "label": "导出标题", "route": "straight" },
-    { "id": "titles-file", "from": "toc_export", "to": "wps_com", "label": "titles_*.txt", "route": "straight", "fromSide": "bottom", "toSide": "top", "labelAt": [1385, 432] },
-    { "id": "pagemap-file", "from": "wps_com", "to": "toc_fill", "label": "pagemap_*.txt", "route": "straight", "fromSide": "bottom", "toSide": "top", "labelAt": [1385, 632] },
-    { "id": "fill-back", "from": "toc_fill", "to": "xiaoben", "label": "回填页码", "variant": "dashed", "route": "straight", "fromSide": "left", "toSide": "right", "via": [[1250, 732], [1250, 532]], "labelAt": [1250, 632] },
-    { "id": "legacy-src", "from": "src", "to": "legacy", "label": "旧链路复跑", "variant": "dashed", "route": "straight", "fromSide": "bottom", "toSide": "top", "labelAt": [115, 542] },
-    { "id": "audit-legacy", "from": "legacy", "to": "audit", "label": "差分核查", "variant": "dashed", "route": "straight" }
+    {
+      "id": "src-read",
+      "from": "src",
+      "to": "richtext",
+      "label": "逐段读取",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "spans",
+      "from": "richtext",
+      "to": "extract_rich",
+      "label": "Span 序列",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "predicates",
+      "from": "merge_jiexi",
+      "to": "extract_rich",
+      "label": "复用判定谓词",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        615,
+        292
+      ]
+    },
+    {
+      "id": "entries",
+      "from": "extract_rich",
+      "to": "build_books",
+      "label": "抽取条目",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "to-daben",
+      "from": "build_books",
+      "to": "daben",
+      "label": "主干区",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          990,
+          412
+        ],
+        [
+          990,
+          332
+        ]
+      ]
+    },
+    {
+      "id": "to-xiaoben",
+      "from": "build_books",
+      "to": "xiaoben",
+      "label": "练习区段",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          865,
+          532
+        ]
+      ]
+    },
+    {
+      "id": "titles",
+      "from": "daben",
+      "to": "toc_export",
+      "label": "导出标题",
+      "route": "straight"
+    },
+    {
+      "id": "titles-file",
+      "from": "toc_export",
+      "to": "wps_com",
+      "label": "titles_*.txt",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1385,
+        432
+      ]
+    },
+    {
+      "id": "pagemap-file",
+      "from": "wps_com",
+      "to": "toc_fill",
+      "label": "pagemap_*.txt",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1385,
+        632
+      ]
+    },
+    {
+      "id": "fill-back",
+      "from": "toc_fill",
+      "to": "xiaoben",
+      "label": "回填页码",
+      "variant": "dashed",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right",
+      "via": [
+        [
+          1250,
+          732
+        ],
+        [
+          1250,
+          532
+        ]
+      ],
+      "labelAt": [
+        1250,
+        632
+      ]
+    },
+    {
+      "id": "legacy-src",
+      "from": "src",
+      "to": "legacy",
+      "label": "旧链路复跑",
+      "variant": "dashed",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        115,
+        542
+      ]
+    },
+    {
+      "id": "audit-legacy",
+      "from": "legacy",
+      "to": "audit",
+      "label": "差分核查",
+      "variant": "dashed",
+      "route": "straight"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "本轮变更", "items": ["新增 richtext / extract_rich / build_books", "交付收拢为 成册解析/ 三个文件", "分册取消，旧链路未重生成"] },
-    { "dot": "violet", "title": "排版与收益", "items": ["EQ 域还原 176/178，上下标全保留", "A4 双栏 + 0.8cm 边距定稿", "1288 页原文 → 157 页（−87.8%）"] },
-    { "dot": "rose", "title": "归类核对", "items": ["大本 1141 + 小本 681 = 1822 条", "章内考点标题重复 41/75 → 0/75", "79 个 PPT 未接入，仅作核对"] }
+    {
+      "dot": "cyan",
+      "title": "本轮变更",
+      "items": [
+        "新增 richtext / extract_rich / build_books",
+        "交付收拢为 成册解析/ 三个文件",
+        "分册取消，旧链路未重生成"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "排版与收益",
+      "items": [
+        "EQ 域还原 176/178，上下标全保留",
+        "A4 双栏 + 0.8cm 边距定稿",
+        "1288 页原文 → 157 页（−87.8%）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "归类核对",
+      "items": [
+        "大本 1141 + 小本 681 = 1822 条",
+        "章内考点标题重复 41/75 → 0/75",
+        "79 个 PPT 未接入，仅作核对"
+      ]
+    }
   ]
 }
